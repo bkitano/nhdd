@@ -1,7 +1,7 @@
 library(magrittr)
 
-path = "~/Desktop/Classes/Fall_2018/S&DS 625/newdata"
-file.names <- dir(path, pattern =".html")
+path = "/Users/bkitano/Desktop/Classes/Fall_2018/S&DS 625/NHHD/newdata"
+file.names <- dir(path, pattern=".html")
 df <- data.frame()
 pb <- txtProgressBar(style = 3)
 
@@ -41,72 +41,38 @@ getRealEstateData <- function(i) {
   rawappraisalstring <- gsub("<[^<>]*>", "", x[appraisalline])
   totval <- as.numeric(gsub("[$,]", "", rawappraisalstring[2]))
   
-  # ---------- BEDROOMS ----------- not ok
+  # ---------- BEDROOMS ----------- not ok (too high by ~120)
   # returns all the matching lines
-  totalbedroomslines <- grep("<td>(Total\\s)*B[e]*dr(oo)*ms[:]*</td>", x, ignore.case=TRUE)
+  totalbedroomslines <- grep("T[o]*t[a]*l(\\s)*B[e]*dr(oo)*ms", x, ignore.case=TRUE)
   
   # returns all the matching strings
   totalbedroomsstrings <- gsub("<[^<>]*>", "", x[totalbedroomslines]) %>% trimws()
   
   # instead of splitting at the colon, search for digits in the line 33
   if( length(totalbedroomsstrings) != 0 ) {
-    
-    # finds the start of digits
-    digitFinder <- regexpr("\\d", totalbedroomsstrings)
-    
-    # cuts the left side of the string off, leaving numbers in the front
-    digitStart <- substr(totalbedroomsstrings, digitFinder, nchar(totalbedroomsstrings))
-
-    # cuts the right side of the string off, leaving just numbers
-    digitEndFinder <- regexpr("\\s", digitStart)
-    
-    if(digitEndFinder != -1) {
-      digits <- substr(digitStart, 0, digitEndFinder) %>% trimws()
-      beds <- sum(as.numeric(digits))
-    } else {
-      beds <- sum(as.numeric(digitStart))
-    }
+    digits <- gsub("\\D", "", totalbedroomsstrings)
+    beds <- sum(as.numeric(digits))
   } else {
     beds <- NA
   }
   
   # ---------- BATHROOMS ---------- not ok
-  totalbathroomsline <- grep("<td>(Total\\s)*B[a]*th(r)*(oo)*(m)*s[:]*</td>", x, ignore.case=TRUE )
+  totalbathroomsline <- grep("T[o]*t[a]*l(\\s)*B[a]*th(r)*(oo)*(m)*s", x, ignore.case=TRUE )
   totalbathroomsstring <- gsub("<[^<>]*>", "", x[totalbathroomsline]) %>% trimws()
   
   # instead of splitting at the colon, search for digits in the line 33
   if( length(totalbathroomsstring) != 0 ) {
-    digitFinder <- regexpr("\\d", totalbathroomsstring)
-  
-    # cuts the back part of the string off, leaving numbers in the front
-    digitStart <- substr(totalbathroomsstring, digitFinder, nchar(totalbathroomsstring))
-      
-    digitEndFinder <- regexpr("\\s", digitStart)
-    if(digitEndFinder != -1) {
-      baths <- sum(as.numeric(substr(digitStart, 0, digitEndFinder) %>% trimws()))
-    } else {
-      baths <- sum(as.numeric(digitStart))
-    }
+    baths <- sum(as.numeric(gsub("\\D","",totalbathroomsstring)))
   } else {
     baths <- NA
   }
   
   # ---------- HALFBATHS ------------
-  totalhbathroomsline <- grep("<td>Total Half Baths:</td>", x, ignore.case=TRUE)
+  totalhbathroomsline <- grep("T[o]*t[a]*l H[a]*lf B[a]*ths", x, ignore.case=TRUE)
   totalhbathroomsstring <- gsub("<[^<>]*>", "", x[totalhbathroomsline]) %>% trimws()
   
   if( length(totalhbathroomsstring) != 0 ) {
-    digitFinder <- regexpr("\\d", totalhbathroomsstring)
-    
-    # cuts the back part of the string off, leaving numbers in the front
-    digitStart <- substr(totalhbathroomsstring, digitFinder, nchar(totalhbathroomsstring))
-    
-    digitEndFinder <- regexpr("\\s", digitStart)
-    if(digitEndFinder != -1) {
-      hbaths <- sum(as.numeric(substr(digitStart, 0, digitEndFinder) %>% trimws()))
-    } else {
-      hbaths <- sum(as.numeric(digitStart))
-    }
+    hbaths <- sum(as.numeric(gsub("\\D", "", totalhbathroomsstring)))
   } else {
     hbaths <- NA
   }
@@ -134,7 +100,8 @@ getRealEstateData <- function(i) {
   landvaltablestring <- gsub( "<[^<>]*>" , "", x[landvaltableline+6]) %>% trimws()
   if(length(landvaltablestring) > 0) {
     numbers_in_line <- strsplit(landvaltablestring, "[$]")[[1]]
-    landval <- ifelse( length(numbers_in_line) > 0, numbers_in_line[3], NA )
+    landvalstring <- ifelse( length(numbers_in_line) > 0, numbers_in_line[3], NA )
+    landval <- as.numeric(gsub("[,]","",landvalstring))
   } else {
     landval <- NA
   }
@@ -187,6 +154,28 @@ getRealEstateData <- function(i) {
   
   owner_address <- ifelse(length(owner_address_stringf) > 0, owner_address_stringf, NA)
   
+  # - 'saledate1', 'saleprice1', 'saleowner1',
+  #   'saledate2', 'saleprice2', 'saleowner2', etc.:
+  #   sale history (up to the 5 most recent; most recent first)
+  
+  
+  # - 'sqft': living area in square feet
+  # ------- SQFT --------
+  sqft_line <- grep("MainContent_ctl01_lblBldArea", x, ignore.case = TRUE)
+  sqft <- ifelse(sqft_line != -1, as.numeric(gsub("\\D","",x[sqft_line])),NA)
+  
+  # - 'pctgood': building percent good
+  # ------- PCTGOOD -------
+  pctgoodline <- grep('MainContent_ctl01_lblPctGood', x, ignore.case = TRUE)
+  pctgood <- ifelse(pctgoodline != -1, as.numeric(gsub("\\D","", x[pctgoodline])), NA )
+  
+  # - 'style', 'model', 'occupancy', 'actype', 'bathstyle', 'kstyle':
+  #      style, model, occupancy, A/C Type, bath style, kitchen style
+  
+  # - 'garagesqft': area of garage in square feet
+  # ------ GARAGESQFT -------
+  
+  
   # put everything in the dataframe
   df[1,'pid'] <- pid
   df[1,'yearbuilt' ] <- yearbuilt
@@ -207,7 +196,10 @@ getRealEstateData <- function(i) {
 }
 
 x = length(file.names)
+# x = 100
 z <- 0
+setwd("~/Desktop/Classes/Fall_2018/S&DS 625/NHHD/newdata")
+
 for (i in 1:x) {
   df <- rbind(df, getRealEstateData(i))
   if(i %% ceiling(x/100) == 0) {
@@ -219,17 +211,30 @@ for (i in 1:x) {
 # order them by number
 df_ordered <- df[order(as.numeric(df[,1])),]
 
-# We discussed multibuilding properties... what to do with them? Sum up their 
-# values (bedrooms, baths, etc.) in addition to flaggin them.
+# When you are done, scrape the last batch of variables below (due next Monday):
+# - 'saledate1', 'saleprice1', 'saleowner1',
+#   'saledate2', 'saleprice2', 'saleowner2', etc.:
+#   sale history (up to the 5 most recent; most recent first)
+# - 'sqft': living area in square feet
+# - 'pctgood': building percent good
+# - 'style', 'model', 'occupancy', 'actype', 'bathstyle', 'kstyle':
+#      style, model, occupancy, A/C Type, bath style, kitchen style
+# - 'garagesqft': area of garage in square feet
+
 
 ### Example record for pid 2334:
-# - 'multibuilding': FALSE
-# - 'zone': 'RS2'
-# - 'neighborhood': '0200'
-# - 'landval': 54400
-# - 'acres': 0.17
-# - 'exval': 3700
-# - 'address': '30 UPSON TER, NEW HAVEN, CT 06512'
+# - 'saledate1': '11/30/2017', 'saleprice1': '0', 'saleowner1': 'PIETRUSZCA DIANE',
+#   'saledate2': '01/15/2014', 'saleprice2': '0', 'saleowner2': 'PIETRUSZCA RAYMOND S',
+#   'saledate3': NA, 'saleprice3': 0, 'saleowner3': 'PIETRUSZKA RAYMOND S & JANE C'
+# - 'sqft': 2100
+# - 'pctgood': 78
+# - 'style': "Colonial"
+# - 'model': "Single Family"
+# - 'occupancy': 1
+# - 'actype': "None"
+# - 'bathstyle': "Average"
+# - 'kstyle': "Average"
+# - 'garagesqft': 0
 
 getRealEstateData(61)
 
