@@ -157,23 +157,163 @@ getRealEstateData <- function(i) {
   # - 'saledate1', 'saleprice1', 'saleowner1',
   #   'saledate2', 'saleprice2', 'saleowner2', etc.:
   #   sale history (up to the 5 most recent; most recent first)
+  # ------ SALE HISTORY -------
+  # finds the start of the table
+  salehistoryline <- grep("MainContent_grdSales", x, ignore.case = TRUE)
+  
+  if(length(salehistoryline) > 0) {
+    
+    # need to find where the table closes
+    hasFoundTableCloseTag <- FALSE
+    lines_ahead <- 1
+    
+    while(!hasFoundTableCloseTag) {
+      if( length(grep("(\\s)*</table>(\\s)*", x[salehistoryline + lines_ahead], ignore.case = TRUE)) > 0) {
+        hasFoundTableCloseTag <- TRUE
+      } else {
+        lines_ahead <- lines_ahead + 1
+      }
+    }
+    
+    nthRecord <- 1
+    salehistory <- data.frame()
+
+    coltitlesnoindex <- c("saleowner", "saleprice", "saledate")
+    
+    for( line in salehistoryline:(salehistoryline+lines_ahead)) {
+      cleanedline <- trimws(x[line])
+      
+      # look at each line with td tags
+      if(length(grep("<td\\s*(.*)>(.*)</td>", cleanedline)) > 0) {
+        coltitleswindex <- paste(coltitlesnoindex, nthRecord, sep="")
+        
+        # split up the tds tag line into individual td
+        tds <- strsplit(cleanedline, "><")
+        for(i in 1:3) {
+          j <- c(1,2,6)
+          data <- trimws(gsub("[<]*(td.*)>(.*)<(/td.*)[>]*", "\\2", tds[[1]][j[i]]))
+          salehistory[1, coltitleswindex[i]] <- ifelse(j[i]==2, as.numeric(gsub("\\D", "", data)), data)
+        }
+        nthRecord <- nthRecord + 1
+      }
+      # print(salehistory)
+    }
+    
+    while(nthRecord <= 5) {
+      coltitleswindex <- paste(coltitlesnoindex, nthRecord, sep="")
+      for(i in 1:3) {
+        salehistory[1, coltitleswindex[i]] <- NA
+      }
+      nthRecord <- nthRecord + 1
+    }
+    
+    salehistory <- salehistory[1, 1:15]
+    
+  } else {
+    print("no sales data")
+    # no sales table
+    salehistory <- NA
+  }
   
   
   # - 'sqft': living area in square feet
   # ------- SQFT --------
   sqft_line <- grep("MainContent_ctl01_lblBldArea", x, ignore.case = TRUE)
-  sqft <- ifelse(sqft_line != -1, as.numeric(gsub("\\D","",x[sqft_line])),NA)
+  if( length(x[sqft_line]) != 0 ) {
+    sqftstring <- gsub("MainContent_ctl01_lblBldArea", "", x[sqft_line])
+    sqft <- sum(as.numeric(gsub("\\D", "", sqftstring)))
+  } else {
+    sqft <- NA
+  }
   
   # - 'pctgood': building percent good
   # ------- PCTGOOD -------
   pctgoodline <- grep('MainContent_ctl01_lblPctGood', x, ignore.case = TRUE)
-  pctgood <- ifelse(pctgoodline != -1, as.numeric(gsub("\\D","", x[pctgoodline])), NA )
+  if( length(x[pctgoodline]) != 0 ) {
+    pctgoodstring <- gsub("MainContent_ctl01_lblPctGood", "", x[pctgoodline])
+    pctgood <- mean(as.numeric(gsub("\\D", "", pctgoodstring)))
+  } else {
+    pctgood <- NA
+  }  
+  
   
   # - 'style', 'model', 'occupancy', 'actype', 'bathstyle', 'kstyle':
   #      style, model, occupancy, A/C Type, bath style, kitchen style
+  # -------- STYLE --------
+  styleline <- grep("<td>Style[:]*</td>", x, ignore.case = TRUE)[1]
+  stylestring <- x[styleline] %>% trimws()
+  style_ <- gsub("<td>(Style|STYLE)[:]*</td><td>(.*)</td>", "\\2", stylestring) %>% trimws()
+  style <- ifelse(style_ == "" || style_ == "NA", NA, style_)
+  
+  # -------- MODEL --------
+  modelline <- grep("<td>Model[:]*</td>", x, ignore.case = TRUE)[1]
+  modelstring <- x[modelline] %>% trimws()
+  model_ <- gsub("<td>(Model|MODEL)[:]*</td><td>(.*)</td>", "\\2", modelstring) %>% trimws()
+  model <- ifelse(model_ == "" || model_ == "NA", NA, model_)
+  
+  # -------- OCCUPANCY --------
+  occupancyline <- grep("<td>Occupancy[:]*</td>", x, ignore.case = TRUE)[1]
+  occupancystring <- x[occupancyline] %>% trimws()
+  occupancy_ <- gsub("<td>(Occupancy|OCCUPANCY)[:]*</td><td>(.*)</td>", "\\2", occupancystring) %>% trimws()
+  occupancy <- ifelse(occupancy_ == "" || occupancy_ == "NA", NA, occupancy_)
+  
+  # -------- ACTYPE --------
+  actypeline <- grep("<td>AC Type[:]*</td>", x, ignore.case = TRUE)[1]
+  actypestring <- x[actypeline] %>% trimws()
+  actype_ <- gsub("<td>(AC Type|AC TYPE)[:]*</td><td>(.*)</td>", "\\2", actypestring) %>% trimws()
+  actype <- ifelse(actype_ == "" || actype_ == "NA", NA, actype_)
+  
+  # -------- BATHSTYLE --------
+  bathstyleline <- grep("<td>Bath Style[:]*</td>", x, ignore.case = TRUE)[1]
+  bathstylestring <- x[bathstyleline] %>% trimws()
+  bathstyle_ <- gsub("<td>(Bath Style|BATH STYLE)[:]*</td><td>(.*)</td>", "\\2", bathstylestring) %>% trimws()
+  bathstyle <- ifelse(bathstyle_ == "" || bathstyle_ == "NA", NA, bathstyle_)
+  
+  # -------- KSTYLE --------
+  kstyleline <- grep("<td>Kitchen Style[:]*</td>", x, ignore.case = TRUE)[1]
+  kstylestring <- x[kstyleline] %>% trimws()
+  kstyle_ <- gsub("<td>(Kitchen Style|KITCHEN STYLE)[:]*</td><td>(.*)</td>", "\\2", kstylestring) %>% trimws()
+  kstyle <- ifelse(kstyle_ == "" || kstyle_ == "NA", NA, kstyle_)
   
   # - 'garagesqft': area of garage in square feet
   # ------ GARAGESQFT -------
+  # finds the start of the table
+  outbuildingsline <- grep("MainContent_grdOb", x, ignore.case = TRUE)
+  
+  if(length(outbuildingsline) > 0) {
+    
+    # need to find where the table closes
+    hasFoundTableCloseTag <- FALSE
+    lines_ahead <- 1
+    
+    while(!hasFoundTableCloseTag) {
+      if( length(grep("(\\s)*</table>(\\s)*", x[outbuildingsline + lines_ahead], ignore.case = TRUE)) > 0) {
+        hasFoundTableCloseTag <- TRUE
+      } else {
+        lines_ahead <- lines_ahead + 1
+      }
+    }
+    
+    totalgsqft <- 0
+    for( line in outbuildingsline:(outbuildingsline+lines_ahead)) {
+      cleanedline <- trimws(x[line])
+      
+      # look at each line with td tags
+      if(length(grep("(GARAGE)", cleanedline)) > 0) {
+        
+        # split up the tds tag line into individual td
+        tds <- strsplit(cleanedline, "><")
+        gsqft <- as.numeric(gsub("\\D", "",tds[[1]][5]))
+        totalgsqft <- totalgsqft + gsqft
+      }
+    }
+    
+    # print(totalgsqft)
+  } else {
+    print("no outbuildings data")
+    # no sales table
+    totalgsqft <- 0
+  }
   
   
   # put everything in the dataframe
@@ -191,7 +331,17 @@ getRealEstateData <- function(i) {
   df[1, 'acres'] <- acres
   df[1, 'exval'] <- costs
   df[1, 'address'] <- owner_address
-  
+  df <- cbind( df, salehistory)
+  df[1, 'pctgood'] <- pctgood
+  df[1, 'sqft'] <- sqft
+  df[1, 'style'] <- style
+  df[1, 'model'] <- model
+  df[1, 'occupancy'] <- occupancy
+  df[1, 'actype'] <- actype
+  df[1, 'bathstyle'] <- bathstyle
+  df[1, 'kstyle'] <- kstyle
+  df[1, 'garagesqft'] <- totalgsqft
+  # cbind sale history
   return(df)
 }
 
@@ -236,6 +386,6 @@ df_ordered <- df[order(as.numeric(df[,1])),]
 # - 'kstyle': "Average"
 # - 'garagesqft': 0
 
-getRealEstateData(61)
+getRealEstateData(2334)
 
-write.csv(df_ordered, file = "nh_real_estate.csv", row.names = FALSE)
+write.csv(df_ordered, file = "nh3.csv", row.names = FALSE)
