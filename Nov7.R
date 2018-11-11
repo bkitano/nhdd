@@ -21,6 +21,7 @@ pids <- x$pid[which(x$ggmap == 'bkk6')]
 # Helpful hints for geocoding:
 
 # ggmap usage:
+library(magrittr)
 library(ggmap)
 geocode("24 Hillhouse Ave., New Haven, CT", source = "dsk")
 
@@ -43,6 +44,23 @@ for (e in df.gg$pid) {
 }
 
 write.csv(cc, 'bkk6_latlon.csv', row.names = FALSE)
+
+dd <- read.csv('bkk6_latlon.csv', as.is = TRUE)
+
+ddd <- dd[-1,]
+
+states <- map_data("state")
+ct <- subset(states, region %in% c( "connecticut"))
+counties <- map_data("county")
+ca_county <- subset(counties, region == "connecticut")
+
+ggplot(data = ct) + 
+  geom_polygon(aes(x = long, y = lat, fill = region, group = group), color = "white") + 
+  coord_fixed(1.3) +
+  guides(fill=FALSE) + 
+  # coord_fixed(xlim = c(-74, -73.0),  ylim = c(41, 42), ratio = 1) + 
+  geom_point(mapping = aes(x = longitude, y = latitude), data = ddd)
+
 
 # ====== don't need this ========
 
